@@ -11,7 +11,7 @@ import (
 )
 
 type WebhookAPI interface {
-	CreateWebhook(url string) (hookID int64, secret string, err error)
+	CreateWebhook(ctx context.Context, url string) (hookID int64, secret string, err error)
 }
 
 type serverAPI struct {
@@ -33,7 +33,7 @@ func (s *serverAPI) CreateWebhook(ctx context.Context, req *pb.CreateWebhookRequ
 		return nil, status.Error(codes.InvalidArgument, "invalid url")
 	}
 
-	hookID, secret, err := s.webhookAPI.CreateWebhook(req.Url)
+	hookID, secret, err := s.webhookAPI.CreateWebhook(ctx, req.Url)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to create webhook")
 	}
