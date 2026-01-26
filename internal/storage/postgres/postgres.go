@@ -24,7 +24,7 @@ func New() (*Storage, error) {
 
 func (s *Storage) SaveWebhook(ctx context.Context, url string, secret string) (int64, error) {
 	var id int64
-	err := s.db.QueryRowContext(ctx, "INSERT INTO webhooks(url, secret) VALUES($1, $2) RETURNING hook_id", url, secret).Scan(&id)
+	err := s.db.QueryRowContext(ctx, "INSERT INTO webhooks(url, secret) VALUES($1, $2) RETURNING id", url, secret).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert webhook: %w", err)
 	}
@@ -32,9 +32,9 @@ func (s *Storage) SaveWebhook(ctx context.Context, url string, secret string) (i
 	return id, nil
 }
 
-func (s *Storage) GetWebhook(ctx context.Context, hookID int64) (models.Webhook, error) {
+func (s *Storage) GetWebhook(ctx context.Context, webhookID int64) (models.Webhook, error) {
 	var webhook models.Webhook
-	err := s.db.QueryRowContext(ctx, "SELECT hook_id, url, secret FROM webhooks WHERE hook_id=$1", hookID).Scan(&webhook.ID, &webhook.URL, &webhook.Secret)
+	err := s.db.QueryRowContext(ctx, "SELECT id, url, secret FROM webhooks WHERE id=$1", webhookID).Scan(&webhook.ID, &webhook.URL, &webhook.Secret)
 	if err != nil {
 		return models.Webhook{}, fmt.Errorf("failed to get webhook: %w", err)
 	}
@@ -42,9 +42,9 @@ func (s *Storage) GetWebhook(ctx context.Context, hookID int64) (models.Webhook,
 	return webhook, nil
 }
 
-func (s *Storage) SaveEvent(ctx context.Context, hookID int64, payload string) (int64, error) {
+func (s *Storage) SaveEvent(ctx context.Context, webhookID int64, payload string) (int64, error) {
 	var id int64
-	err := s.db.QueryRowContext(ctx, "INSERT INTO events(hook_id, payload) VALUES($1, $2) RETURNING event_id", hookID, payload).Scan(&id)
+	err := s.db.QueryRowContext(ctx, "INSERT INTO events(webhook_id, payload) VALUES($1, $2) RETURNING id", webhookID, payload).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert event: %w", err)
 	}

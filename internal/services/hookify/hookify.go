@@ -17,22 +17,22 @@ type Service struct {
 }
 
 type WebhookSaver interface {
-	SaveWebhook(context context.Context, url string, secret string) (int64, error)
+	SaveWebhook(ctx context.Context, url string, secret string) (int64, error)
 }
 
 type EventSaver interface {
-	SaveEvent(context context.Context, hookID int64, payload string) (int64, error)
+	SaveEvent(ctx context.Context, webhookID int64, payload string) (int64, error)
 }
 
 type EventPublisher interface {
-	PublishEvent(context context.Context, event models.RawEvent) error
+	PublishEvent(ctx context.Context, event models.RawEvent) error
 }
 
 func New(log *slog.Logger, webhookSaver WebhookSaver, eventSaver EventSaver, eventPublisher EventPublisher) *Service {
 	return &Service{log: log, webhookSaver: webhookSaver, eventSaver: eventSaver, eventPublisher: eventPublisher}
 }
 
-func (s *Service) CreateWebhook(context context.Context, url string) (webhookID int64, secret string, err error) {
+func (s *Service) CreateWebhook(ctx context.Context, url string) (webhookID int64, secret string, err error) {
 	secretBytes := make([]byte, 32)
 	_, err = rand.Read(secretBytes)
 	if err != nil {
@@ -41,7 +41,7 @@ func (s *Service) CreateWebhook(context context.Context, url string) (webhookID 
 	}
 	secret = hex.EncodeToString(secretBytes)
 
-	webhookID, err = s.webhookSaver.SaveWebhook(context, url, secret)
+	webhookID, err = s.webhookSaver.SaveWebhook(ctx, url, secret)
 	if err != nil {
 		s.log.Error("failed to save webhook", "error", err)
 		return 0, "", err
@@ -58,9 +58,9 @@ func (s *Service) SubmitEvent(ctx context.Context, webhookID int64, payload stri
 
 	// TODO: This design is naive and should be improved in the future.
 	rawEvent := models.RawEvent{
-		ID:      eventID,
-		HookID:  webhookID,
-		Payload: payload,
+		ID:        eventID,
+		WebhookID: webhookID,
+		Payload:   payload,
 	}
 
 	err = s.eventPublisher.PublishEvent(ctx, rawEvent)

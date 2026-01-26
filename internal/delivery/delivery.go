@@ -15,7 +15,7 @@ type Service struct {
 }
 
 type WebhookProvider interface {
-	GetWebhook(ctx context.Context, hookID int64) (models.Webhook, error)
+	GetWebhook(ctx context.Context, webhookID int64) (models.Webhook, error)
 }
 
 func New(log *slog.Logger, webhookProvider WebhookProvider) *Service {
@@ -26,10 +26,10 @@ func New(log *slog.Logger, webhookProvider WebhookProvider) *Service {
 }
 
 func (s *Service) HandleEvent(ctx context.Context, event models.RawEvent) error {
-	s.log.Info("handling event", "event_id", event.ID, "hook_id", event.HookID)
+	s.log.Info("handling event", "event_id", event.ID, "webhook_id", event.WebhookID)
 
 	// TODO: Use worker pool
-	webhook, err := s.webhookProvider.GetWebhook(ctx, event.HookID)
+	webhook, err := s.webhookProvider.GetWebhook(ctx, event.WebhookID)
 	if err != nil {
 		return fmt.Errorf("failed to get webhook: %w", err)
 	}
@@ -39,7 +39,7 @@ func (s *Service) HandleEvent(ctx context.Context, event models.RawEvent) error 
 		return fmt.Errorf("failed to send request: %w", err)
 	}
 
-	s.log.Info("event handled successfully", "event_id", event.ID, "hook_id", event.HookID)
+	s.log.Info("event handled successfully", "event_id", event.ID, "webhook_id", event.WebhookID)
 
 	return nil
 }

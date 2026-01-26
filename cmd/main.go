@@ -11,16 +11,19 @@ import (
 )
 
 func main() {
-	app := app.New(slog.Default(), 50051)
+	application, err := app.New(slog.Default(), 50051)
+	if err != nil {
+		slog.Error("failed to create app", "error", err)
+		os.Exit(1)
+	}
 
-	go app.GRPCServer.MustRun()
-	go app.EventQueue.Run(context.Background())
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
-	<-stop
-	app.GRPCServer.Stop()
+	if err := application.Run(ctx); err != nil {
+		slog.Error("application stopped with error", "error", err)
+		os.Exit(1)
+	}
 
 	slog.Info("application stopped")
 }
