@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package hookify;
+
+option go_package = "hookify/gen/hookify";
+
+service Hookify {
+    rpc CreateWebhook(CreateWebhookRequest) returns (CreateWebhookResponse);
+}
+
+message CreateWebhookRequest {
+    string url = 1;
+}
+
+message CreateWebhookResponse {
+    int64 id = 1;
+    string secret = 2;
+}
