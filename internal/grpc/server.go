@@ -2,8 +2,10 @@ package grpc
 
 import (
 	"context"
-	pb "hookify/gen/hookify"
+	"log/slog"
 	"net/url"
+
+	pb "hookify/gen/hookify"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -11,16 +13,18 @@ import (
 )
 
 type WebhookAPI interface {
-	CreateWebhook(ctx context.Context, url string) (hookID int64, secret string, err error)
+	CreateWebhook(ctx context.Context, url string) (webhookID int64, secret string, err error)
+	SubmitEvent(ctx context.Context, webhookID int64, payload string, secret string) (eventID int64, err error)
 }
 
 type serverAPI struct {
 	pb.UnimplementedHookifyServer
 	webhookAPI WebhookAPI
+	log        *slog.Logger
 }
 
-func Register(s *grpc.Server, api WebhookAPI) {
-	pb.RegisterHookifyServer(s, &serverAPI{webhookAPI: api})
+func Register(s *grpc.Server, api WebhookAPI, log *slog.Logger) {
+	pb.RegisterHookifyServer(s, &serverAPI{webhookAPI: api, log: log})
 }
 
 func (s *serverAPI) CreateWebhook(ctx context.Context, req *pb.CreateWebhookRequest) (*pb.CreateWebhookResponse, error) {
@@ -33,14 +37,33 @@ func (s *serverAPI) CreateWebhook(ctx context.Context, req *pb.CreateWebhookRequ
 		return nil, status.Error(codes.InvalidArgument, "invalid url")
 	}
 
-	hookID, secret, err := s.webhookAPI.CreateWebhook(ctx, req.Url)
+	webhookID, secret, err := s.webhookAPI.CreateWebhook(ctx, req.Url)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to create webhook")
 	}
 
 	resp := &pb.CreateWebhookResponse{
-		Id:     hookID,
-		Secret: secret,
+		WebhookId: webhookID,
+		Secret:    secret,
+	}
+
+	return resp, nil
+}
+
+func (s *serverAPI) SubmitEvent(ctx context.Context, req *pb.SubmitEventRequest) (*pb.SubmitEventResponse, error) {
+	if req.Secret == "" {
+		return nil, status.Error(codes.InvalidArgument, "secret is required")
+	}
+
+	eventID, err := s.webhookAPI.SubmitEvent(ctx, req.WebhookId, req.Payload, req.Secret)
+	if err != nil {
+		s.log.Error("failed to submit event", "error", err)
+		return nil, status.Error(codes.Internal, "failed to submit event")
+	}
+
+	resp := &pb.SubmitEventResponse{
+		EventId: eventID,
+		Created: true,
 	}
 
 	return resp, nil

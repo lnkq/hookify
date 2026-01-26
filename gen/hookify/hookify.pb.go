@@ -67,7 +67,7 @@ func (x *CreateWebhookRequest) GetUrl() string {
 
 type CreateWebhookResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	WebhookId     int64                  `protobuf:"varint,1,opt,name=webhook_id,json=webhookId,proto3" json:"webhook_id,omitempty"`
 	Secret        string                 `protobuf:"bytes,2,opt,name=secret,proto3" json:"secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -103,9 +103,9 @@ func (*CreateWebhookResponse) Descriptor() ([]byte, []int) {
 	return file_hookify_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *CreateWebhookResponse) GetId() int64 {
+func (x *CreateWebhookResponse) GetWebhookId() int64 {
 	if x != nil {
-		return x.Id
+		return x.WebhookId
 	}
 	return 0
 }
@@ -117,18 +117,140 @@ func (x *CreateWebhookResponse) GetSecret() string {
 	return ""
 }
 
+type SubmitEventRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WebhookId     int64                  `protobuf:"varint,1,opt,name=webhook_id,json=webhookId,proto3" json:"webhook_id,omitempty"`
+	Payload       string                 `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
+	Secret        string                 `protobuf:"bytes,3,opt,name=secret,proto3" json:"secret,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmitEventRequest) Reset() {
+	*x = SubmitEventRequest{}
+	mi := &file_hookify_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitEventRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitEventRequest) ProtoMessage() {}
+
+func (x *SubmitEventRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hookify_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitEventRequest.ProtoReflect.Descriptor instead.
+func (*SubmitEventRequest) Descriptor() ([]byte, []int) {
+	return file_hookify_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SubmitEventRequest) GetWebhookId() int64 {
+	if x != nil {
+		return x.WebhookId
+	}
+	return 0
+}
+
+func (x *SubmitEventRequest) GetPayload() string {
+	if x != nil {
+		return x.Payload
+	}
+	return ""
+}
+
+func (x *SubmitEventRequest) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
+type SubmitEventResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventId       int64                  `protobuf:"varint,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	Created       bool                   `protobuf:"varint,2,opt,name=created,proto3" json:"created,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmitEventResponse) Reset() {
+	*x = SubmitEventResponse{}
+	mi := &file_hookify_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitEventResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitEventResponse) ProtoMessage() {}
+
+func (x *SubmitEventResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hookify_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitEventResponse.ProtoReflect.Descriptor instead.
+func (*SubmitEventResponse) Descriptor() ([]byte, []int) {
+	return file_hookify_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SubmitEventResponse) GetEventId() int64 {
+	if x != nil {
+		return x.EventId
+	}
+	return 0
+}
+
+func (x *SubmitEventResponse) GetCreated() bool {
+	if x != nil {
+		return x.Created
+	}
+	return false
+}
+
 var File_hookify_proto protoreflect.FileDescriptor
 
 const file_hookify_proto_rawDesc = "" +
 	"\n" +
 	"\rhookify.proto\x12\ahookify\"(\n" +
 	"\x14CreateWebhookRequest\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\"?\n" +
-	"\x15CreateWebhookResponse\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x16\n" +
-	"\x06secret\x18\x02 \x01(\tR\x06secret2Y\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"N\n" +
+	"\x15CreateWebhookResponse\x12\x1d\n" +
+	"\n" +
+	"webhook_id\x18\x01 \x01(\x03R\twebhookId\x12\x16\n" +
+	"\x06secret\x18\x02 \x01(\tR\x06secret\"e\n" +
+	"\x12SubmitEventRequest\x12\x1d\n" +
+	"\n" +
+	"webhook_id\x18\x01 \x01(\x03R\twebhookId\x12\x18\n" +
+	"\apayload\x18\x02 \x01(\tR\apayload\x12\x16\n" +
+	"\x06secret\x18\x03 \x01(\tR\x06secret\"J\n" +
+	"\x13SubmitEventResponse\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\x03R\aeventId\x12\x18\n" +
+	"\acreated\x18\x02 \x01(\bR\acreated2\xa3\x01\n" +
 	"\aHookify\x12N\n" +
-	"\rCreateWebhook\x12\x1d.hookify.CreateWebhookRequest\x1a\x1e.hookify.CreateWebhookResponseB\x15Z\x13hookify/gen/hookifyb\x06proto3"
+	"\rCreateWebhook\x12\x1d.hookify.CreateWebhookRequest\x1a\x1e.hookify.CreateWebhookResponse\x12H\n" +
+	"\vSubmitEvent\x12\x1b.hookify.SubmitEventRequest\x1a\x1c.hookify.SubmitEventResponseB\x15Z\x13hookify/gen/hookifyb\x06proto3"
 
 var (
 	file_hookify_proto_rawDescOnce sync.Once
@@ -142,16 +264,20 @@ func file_hookify_proto_rawDescGZIP() []byte {
 	return file_hookify_proto_rawDescData
 }
 
-var file_hookify_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_hookify_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_hookify_proto_goTypes = []any{
 	(*CreateWebhookRequest)(nil),  // 0: hookify.CreateWebhookRequest
 	(*CreateWebhookResponse)(nil), // 1: hookify.CreateWebhookResponse
+	(*SubmitEventRequest)(nil),    // 2: hookify.SubmitEventRequest
+	(*SubmitEventResponse)(nil),   // 3: hookify.SubmitEventResponse
 }
 var file_hookify_proto_depIdxs = []int32{
 	0, // 0: hookify.Hookify.CreateWebhook:input_type -> hookify.CreateWebhookRequest
-	1, // 1: hookify.Hookify.CreateWebhook:output_type -> hookify.CreateWebhookResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: hookify.Hookify.SubmitEvent:input_type -> hookify.SubmitEventRequest
+	1, // 2: hookify.Hookify.CreateWebhook:output_type -> hookify.CreateWebhookResponse
+	3, // 3: hookify.Hookify.SubmitEvent:output_type -> hookify.SubmitEventResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -168,7 +294,7 @@ func file_hookify_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hookify_proto_rawDesc), len(file_hookify_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

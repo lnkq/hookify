@@ -18,7 +18,7 @@ type App struct {
 
 func New(log *slog.Logger, webhookAPI hookifygrpc.WebhookAPI, port int) *App {
 	gRPCServer := grpc.NewServer()
-	hookifygrpc.Register(gRPCServer, webhookAPI)
+	hookifygrpc.Register(gRPCServer, webhookAPI, log)
 	return &App{
 		log:        log,
 		gRPCServer: gRPCServer,

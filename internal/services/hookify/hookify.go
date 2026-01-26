@@ -4,23 +4,35 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"hookify/internal/models"
 	"log/slog"
 )
 
 type Service struct {
-	log          *slog.Logger
-	webhookSaver WebhookSaver
+	log            *slog.Logger
+	webhookSaver   WebhookSaver
+	eventSaver     EventSaver
+	eventPublisher EventPublisher
 }
 
 type WebhookSaver interface {
 	SaveWebhook(context context.Context, url string, secret string) (int64, error)
 }
 
-func New(log *slog.Logger, webhookSaver WebhookSaver) *Service {
-	return &Service{log: log, webhookSaver: webhookSaver}
+type EventSaver interface {
+	SaveEvent(context context.Context, hookID int64, payload string) (int64, error)
 }
 
-func (s *Service) CreateWebhook(context context.Context, url string) (hookID int64, secret string, err error) {
+type EventPublisher interface {
+	PublishEvent(context context.Context, event models.RawEvent) error
+}
+
+func New(log *slog.Logger, webhookSaver WebhookSaver, eventSaver EventSaver, eventPublisher EventPublisher) *Service {
+	return &Service{log: log, webhookSaver: webhookSaver, eventSaver: eventSaver, eventPublisher: eventPublisher}
+}
+
+func (s *Service) CreateWebhook(context context.Context, url string) (webhookID int64, secret string, err error) {
 	secretBytes := make([]byte, 32)
 	_, err = rand.Read(secretBytes)
 	if err != nil {
@@ -29,11 +41,32 @@ func (s *Service) CreateWebhook(context context.Context, url string) (hookID int
 	}
 	secret = hex.EncodeToString(secretBytes)
 
-	hookID, err = s.webhookSaver.SaveWebhook(context, url, secret)
+	webhookID, err = s.webhookSaver.SaveWebhook(context, url, secret)
 	if err != nil {
 		s.log.Error("failed to save webhook", "error", err)
 		return 0, "", err
 	}
 
-	return hookID, secret, nil
+	return webhookID, secret, nil
+}
+
+func (s *Service) SubmitEvent(ctx context.Context, webhookID int64, payload string, secret string) (eventID int64, err error) {
+	eventID, err = s.eventSaver.SaveEvent(ctx, webhookID, payload)
+	if err != nil {
+		return 0, fmt.Errorf("failed to save event: %w", err)
+	}
+
+	// TODO: This design is naive and should be improved in the future.
+	rawEvent := models.RawEvent{
+		ID:      eventID,
+		HookID:  webhookID,
+		Payload: payload,
+	}
+
+	err = s.eventPublisher.PublishEvent(ctx, rawEvent)
+	if err != nil {
+		s.log.Error("failed to publish event", "error", err)
+	}
+
+	return eventID, nil
 }

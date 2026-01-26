@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	Hookify_CreateWebhook_FullMethodName = "/hookify.Hookify/CreateWebhook"
+	Hookify_SubmitEvent_FullMethodName   = "/hookify.Hookify/SubmitEvent"
 )
 
 // HookifyClient is the client API for Hookify service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type HookifyClient interface {
 	CreateWebhook(ctx context.Context, in *CreateWebhookRequest, opts ...grpc.CallOption) (*CreateWebhookResponse, error)
+	SubmitEvent(ctx context.Context, in *SubmitEventRequest, opts ...grpc.CallOption) (*SubmitEventResponse, error)
 }
 
 type hookifyClient struct {
@@ -46,11 +48,21 @@ func (c *hookifyClient) CreateWebhook(ctx context.Context, in *CreateWebhookRequ
 	return out, nil
 }
 
+func (c *hookifyClient) SubmitEvent(ctx context.Context, in *SubmitEventRequest, opts ...grpc.CallOption) (*SubmitEventResponse, error) {
+	out := new(SubmitEventResponse)
+	err := c.cc.Invoke(ctx, Hookify_SubmitEvent_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // HookifyServer is the server API for Hookify service.
 // All implementations must embed UnimplementedHookifyServer
 // for forward compatibility
 type HookifyServer interface {
 	CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error)
+	SubmitEvent(context.Context, *SubmitEventRequest) (*SubmitEventResponse, error)
 	mustEmbedUnimplementedHookifyServer()
 }
 
@@ -60,6 +72,9 @@ type UnimplementedHookifyServer struct {
 
 func (UnimplementedHookifyServer) CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateWebhook not implemented")
+}
+func (UnimplementedHookifyServer) SubmitEvent(context.Context, *SubmitEventRequest) (*SubmitEventResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitEvent not implemented")
 }
 func (UnimplementedHookifyServer) mustEmbedUnimplementedHookifyServer() {}
 
@@ -92,6 +107,24 @@ func _Hookify_CreateWebhook_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Hookify_SubmitEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitEventRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HookifyServer).SubmitEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Hookify_SubmitEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HookifyServer).SubmitEvent(ctx, req.(*SubmitEventRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Hookify_ServiceDesc is the grpc.ServiceDesc for Hookify service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -102,6 +135,10 @@ var Hookify_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateWebhook",
 			Handler:    _Hookify_CreateWebhook_Handler,
+		},
+		{
+			MethodName: "SubmitEvent",
+			Handler:    _Hookify_SubmitEvent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

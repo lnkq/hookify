@@ -6,6 +6,7 @@ option go_package = "hookify/gen/hookify";
 
 service Hookify {
     rpc CreateWebhook(CreateWebhookRequest) returns (CreateWebhookResponse);
+    rpc SubmitEvent(SubmitEventRequest) returns (SubmitEventResponse);
 }
 
 message CreateWebhookRequest {
@@ -13,6 +14,17 @@ message CreateWebhookRequest {
 }
 
 message CreateWebhookResponse {
-    int64 id = 1;
+    int64 webhook_id = 1;
     string secret = 2;
+}
+
+message SubmitEventRequest {
+    int64 webhook_id = 1;
+    string payload = 2;
+    string secret = 3;
+}
+
+message SubmitEventResponse {
+    int64 event_id = 1;
+    bool created = 2;
 }

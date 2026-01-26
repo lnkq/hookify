@@ -3,6 +3,9 @@ package app
 import (
 	"log/slog"
 
+	"hookify/internal/delivery"
+	"hookify/internal/kafka/consumer"
+	"hookify/internal/kafka/publisher"
 	"hookify/internal/services/hookify"
 	"hookify/internal/storage/postgres"
 
@@ -12,6 +15,7 @@ import (
 type App struct {
 	log        *slog.Logger
 	GRPCServer *grpcapp.App
+	EventQueue *consumer.Consumer
 }
 
 func New(log *slog.Logger, grpcPort int) *App {
@@ -21,12 +25,15 @@ func New(log *slog.Logger, grpcPort int) *App {
 		return nil
 	}
 
-	hookifyService := hookify.New(log, storage)
+	publisher := publisher.New(log)
+	hookifyService := hookify.New(log, storage, storage, publisher)
 
 	gRPCServer := grpcapp.New(log, hookifyService, grpcPort)
+	deliveryService := delivery.New(log, storage)
 
 	return &App{
 		log:        log,
 		GRPCServer: gRPCServer,
+		EventQueue: consumer.New(log, deliveryService),
 	}
 }
