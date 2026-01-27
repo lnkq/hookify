@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"hookify/internal/config"
 	"hookify/internal/delivery"
 	"hookify/internal/kafka"
 	"hookify/internal/services/hookify"
@@ -20,23 +21,18 @@ type App struct {
 	producer   *kafka.Producer
 }
 
-func New(log *slog.Logger, grpcPort int) (*App, error) {
-	storage, err := postgres.New()
+func New(log *slog.Logger, cfg config.Config) (*App, error) {
+	storage, err := postgres.New(cfg.PostgresDSN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create postgres storage: %w", err)
 	}
 
-	brokers := []string{"localhost:9092"}
-	topic := "webhook.events.raw"
-	groupID := "hookify-consumer-1"
-
-	producer := kafka.NewProducer(log, brokers, topic)
+	producer := kafka.NewProducer(log, cfg.KafkaBrokers, cfg.KafkaTopic)
 	hookifyService := hookify.New(log, storage, storage, producer)
 
-	gRPCServer := grpcapp.New(log, hookifyService, grpcPort)
+	gRPCServer := grpcapp.New(log, hookifyService, cfg.GRPCPort)
 	deliveryService := delivery.New(log, storage, storage)
-
-	consumer := kafka.NewConsumer(log, brokers, topic, groupID, deliveryService)
+	consumer := kafka.NewConsumer(log, cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID, deliveryService)
 
 	return &App{
 		log:        log,

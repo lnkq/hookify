@@ -14,8 +14,8 @@ type Storage struct {
 	db *sql.DB
 }
 
-func New() (*Storage, error) {
-	db, err := sql.Open("postgres", "user=postgres password=postgres dbname=hookify sslmode=disable")
+func New(dsn string) (*Storage, error) {
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open postgres connection: %w", err)
 	}

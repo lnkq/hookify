@@ -8,10 +8,17 @@ import (
 	"syscall"
 
 	"hookify/internal/app"
+	"hookify/internal/config"
 )
 
 func main() {
-	application, err := app.New(slog.Default(), 50051)
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
+	}
+
+	application, err := app.New(slog.Default(), cfg)
 	if err != nil {
 		slog.Error("failed to create app", "error", err)
 		os.Exit(1)
