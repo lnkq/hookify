@@ -34,7 +34,7 @@ func New(log *slog.Logger, grpcPort int) (*App, error) {
 	hookifyService := hookify.New(log, storage, storage, producer)
 
 	gRPCServer := grpcapp.New(log, hookifyService, grpcPort)
-	deliveryService := delivery.New(log, storage)
+	deliveryService := delivery.New(log, storage, storage)
 
 	consumer := kafka.NewConsumer(log, brokers, topic, groupID, deliveryService)
 

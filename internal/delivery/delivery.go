@@ -10,18 +10,24 @@ import (
 )
 
 type Service struct {
-	log             *slog.Logger
-	webhookProvider WebhookProvider
+	log                *slog.Logger
+	webhookProvider    WebhookProvider
+	eventStatusUpdater EventStatusUpdater
 }
 
 type WebhookProvider interface {
 	GetWebhook(ctx context.Context, webhookID int64) (models.Webhook, error)
 }
 
-func New(log *slog.Logger, webhookProvider WebhookProvider) *Service {
+type EventStatusUpdater interface {
+	UpdateEventStatus(ctx context.Context, eventID int64, status models.EventStatus) error
+}
+
+func New(log *slog.Logger, webhookProvider WebhookProvider, eventStatusUpdater EventStatusUpdater) *Service {
 	return &Service{
-		log:             log,
-		webhookProvider: webhookProvider,
+		log:                log,
+		webhookProvider:    webhookProvider,
+		eventStatusUpdater: eventStatusUpdater,
 	}
 }
 
@@ -36,7 +42,14 @@ func (s *Service) HandleEvent(ctx context.Context, event models.RawEvent) error 
 
 	err = s.sendRequest(ctx, webhook.URL, webhook.Secret, event.Payload)
 	if err != nil {
+		if updateErr := s.eventStatusUpdater.UpdateEventStatus(ctx, event.ID, models.EventStatusFailed); updateErr != nil {
+			s.log.Error("failed to update event status to failed", "error", updateErr)
+		}
 		return fmt.Errorf("failed to send request: %w", err)
+	}
+
+	if err := s.eventStatusUpdater.UpdateEventStatus(ctx, event.ID, models.EventStatusDelivered); err != nil {
+		return fmt.Errorf("failed to update event status: %w", err)
 	}
 
 	s.log.Info("event handled successfully", "event_id", event.ID, "webhook_id", event.WebhookID)

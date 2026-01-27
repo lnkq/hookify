@@ -55,3 +55,12 @@ func (s *Storage) SaveEvent(ctx context.Context, webhookID int64, payload string
 
 	return id, nil
 }
+
+func (s *Storage) UpdateEventStatus(ctx context.Context, eventID int64, status models.EventStatus) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE events SET status=$1 WHERE id=$2", status, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to update event status: %w", err)
+	}
+
+	return nil
+}
