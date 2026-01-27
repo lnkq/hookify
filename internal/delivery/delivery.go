@@ -61,7 +61,11 @@ func (s *Service) sendRequest(ctx context.Context, url, secret, payload string) 
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			s.log.Error("failed to close response body", "error", err)
+		}
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("received non-2xx response: %d", resp.StatusCode)
