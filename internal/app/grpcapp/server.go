@@ -26,12 +26,6 @@ func New(log *slog.Logger, webhookAPI grpcapi.WebhookAPI, port int) *Server {
 	}
 }
 
-func (s *Server) MustRun() {
-	if err := s.Run(); err != nil {
-		panic(err)
-	}
-}
-
 func (s *Server) Run() error {
 	const op = "grpcapp.Run"
 	log := s.log.With(slog.String("op", op))

@@ -50,8 +50,6 @@ func (c *Consumer) Run(ctx context.Context) error {
 			continue
 		}
 
-		c.log.Debug("received message", "key", string(m.Key), "value", string(m.Value))
-
 		var event models.RawEvent
 		if err := json.Unmarshal(m.Value, &event); err != nil {
 			c.log.Error("failed to unmarshal message", "error", err)
