@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"hookify/internal/models"
 
@@ -36,6 +37,9 @@ func (s *Storage) GetWebhook(ctx context.Context, webhookID int64) (models.Webho
 	var webhook models.Webhook
 	err := s.db.QueryRowContext(ctx, "SELECT id, url, secret FROM webhooks WHERE id=$1", webhookID).Scan(&webhook.ID, &webhook.URL, &webhook.Secret)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Webhook{}, models.ErrWebhookNotFound
+		}
 		return models.Webhook{}, fmt.Errorf("failed to get webhook: %w", err)
 	}
 

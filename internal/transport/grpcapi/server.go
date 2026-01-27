@@ -2,10 +2,13 @@ package grpcapi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/url"
 
 	pb "hookify/gen/hookify"
+	"hookify/internal/models"
+	"hookify/internal/services/hookify"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -57,6 +60,13 @@ func (s *serverAPI) SubmitEvent(ctx context.Context, req *pb.SubmitEventRequest)
 
 	eventID, err := s.webhookAPI.SubmitEvent(ctx, req.WebhookId, req.Payload, req.Secret)
 	if err != nil {
+		if errors.Is(err, models.ErrWebhookNotFound) {
+			return nil, status.Error(codes.NotFound, "webhook not found")
+		}
+		if errors.Is(err, hookify.ErrInvalidWebhookSecret) {
+			return nil, status.Error(codes.Unauthenticated, "invalid webhook secret")
+		}
+
 		s.log.Error("failed to submit event", "error", err)
 		return nil, status.Error(codes.Internal, "failed to submit event")
 	}

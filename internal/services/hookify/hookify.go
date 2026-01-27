@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hookify/internal/models"
 	"log/slog"
@@ -11,13 +12,14 @@ import (
 
 type Service struct {
 	log            *slog.Logger
-	webhookSaver   WebhookSaver
+	webhookRepo    WebhookRepository
 	eventSaver     EventSaver
 	eventPublisher EventPublisher
 }
 
-type WebhookSaver interface {
+type WebhookRepository interface {
 	SaveWebhook(ctx context.Context, url string, secret string) (int64, error)
+	GetWebhook(ctx context.Context, webhookID int64) (models.Webhook, error)
 }
 
 type EventSaver interface {
@@ -28,8 +30,8 @@ type EventPublisher interface {
 	PublishEvent(ctx context.Context, event models.RawEvent) error
 }
 
-func New(log *slog.Logger, webhookSaver WebhookSaver, eventSaver EventSaver, eventPublisher EventPublisher) *Service {
-	return &Service{log: log, webhookSaver: webhookSaver, eventSaver: eventSaver, eventPublisher: eventPublisher}
+func New(log *slog.Logger, webhookRepo WebhookRepository, eventSaver EventSaver, eventPublisher EventPublisher) *Service {
+	return &Service{log: log, webhookRepo: webhookRepo, eventSaver: eventSaver, eventPublisher: eventPublisher}
 }
 
 func (s *Service) CreateWebhook(ctx context.Context, url string) (webhookID int64, secret string, err error) {
@@ -41,7 +43,7 @@ func (s *Service) CreateWebhook(ctx context.Context, url string) (webhookID int6
 	}
 	secret = hex.EncodeToString(secretBytes)
 
-	webhookID, err = s.webhookSaver.SaveWebhook(ctx, url, secret)
+	webhookID, err = s.webhookRepo.SaveWebhook(ctx, url, secret)
 	if err != nil {
 		s.log.Error("failed to save webhook", "error", err)
 		return 0, "", err
@@ -51,6 +53,18 @@ func (s *Service) CreateWebhook(ctx context.Context, url string) (webhookID int6
 }
 
 func (s *Service) SubmitEvent(ctx context.Context, webhookID int64, payload string, secret string) (eventID int64, err error) {
+	webhook, err := s.webhookRepo.GetWebhook(ctx, webhookID)
+	if err != nil {
+		if errors.Is(err, models.ErrWebhookNotFound) {
+			return 0, models.ErrWebhookNotFound
+		}
+		return 0, fmt.Errorf("failed to verify webhook existence: %w", err)
+	}
+
+	if webhook.Secret != secret {
+		return 0, ErrInvalidWebhookSecret
+	}
+
 	eventID, err = s.eventSaver.SaveEvent(ctx, webhookID, payload)
 	if err != nil {
 		return 0, fmt.Errorf("failed to save event: %w", err)
@@ -61,6 +75,7 @@ func (s *Service) SubmitEvent(ctx context.Context, webhookID int64, payload stri
 		ID:        eventID,
 		WebhookID: webhookID,
 		Payload:   payload,
+		Status:    models.EventStatusPending,
 	}
 
 	err = s.eventPublisher.PublishEvent(ctx, rawEvent)
