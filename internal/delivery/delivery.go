@@ -5,14 +5,17 @@ import (
 	"context"
 	"fmt"
 	"hookify/internal/models"
+	"io"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 type Service struct {
 	log                *slog.Logger
 	webhookProvider    WebhookProvider
 	eventStatusUpdater EventStatusUpdater
+	httpClient         *http.Client
 }
 
 type WebhookProvider interface {
@@ -28,6 +31,9 @@ func New(log *slog.Logger, webhookProvider WebhookProvider, eventStatusUpdater E
 		log:                log,
 		webhookProvider:    webhookProvider,
 		eventStatusUpdater: eventStatusUpdater,
+		httpClient: &http.Client{
+			Timeout: 15 * time.Second,
+		},
 	}
 }
 
@@ -70,11 +76,12 @@ func (s *Service) sendRequest(ctx context.Context, url, secret, payload string) 
 		req.Header.Set("X-Secret", secret)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
 	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		if err := resp.Body.Close(); err != nil {
 			s.log.Error("failed to close response body", "error", err)
 		}
