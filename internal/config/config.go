@@ -11,15 +11,22 @@ import (
 )
 
 type Config struct {
-	PostgresDSN  string
-	KafkaBrokers []string
-	KafkaTopic   string
-	KafkaGroupID string
-	GRPCPort     int
+	Env             string
+	PostgresDSN     string
+	KafkaBrokers    []string
+	KafkaTopic      string
+	KafkaGroupID    string
+	GRPCPort        int
+	ConsumerWorkers int
 }
 
 func Load() (Config, error) {
 	_ = godotenv.Load()
+
+	env := strings.TrimSpace(os.Getenv("HOOKIFY_ENV"))
+	if env == "" {
+		env = "development"
+	}
 
 	postgresDSN := strings.TrimSpace(os.Getenv("HOOKIFY_POSTGRES_DSN"))
 	if postgresDSN == "" {
@@ -61,11 +68,25 @@ func Load() (Config, error) {
 		grpcPort = p
 	}
 
+	workers := 1
+	if v := strings.TrimSpace(os.Getenv("HOOKIFY_CONSUMER_WORKERS")); v != "" {
+		w, err := strconv.Atoi(v)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid HOOKIFY_CONSUMER_WORKERS: %w", err)
+		}
+		if w <= 0 {
+			return Config{}, errors.New("HOOKIFY_CONSUMER_WORKERS must be > 0")
+		}
+		workers = w
+	}
+
 	return Config{
-		PostgresDSN:  postgresDSN,
-		KafkaBrokers: brokers,
-		KafkaTopic:   topic,
-		KafkaGroupID: groupID,
-		GRPCPort:     grpcPort,
+		Env:             env,
+		PostgresDSN:     postgresDSN,
+		KafkaBrokers:    brokers,
+		KafkaTopic:      topic,
+		KafkaGroupID:    groupID,
+		GRPCPort:        grpcPort,
+		ConsumerWorkers: workers,
 	}, nil
 }

@@ -40,7 +40,6 @@ func New(log *slog.Logger, webhookProvider WebhookProvider, eventStatusUpdater E
 func (s *Service) HandleEvent(ctx context.Context, event models.RawEvent) error {
 	s.log.Info("handling event", "event_id", event.ID, "webhook_id", event.WebhookID)
 
-	// TODO: Use worker pool
 	webhook, err := s.webhookProvider.GetWebhook(ctx, event.WebhookID)
 	if err != nil {
 		return fmt.Errorf("failed to get webhook: %w", err)

@@ -5,10 +5,13 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"hookify/internal/app"
 	"hookify/internal/config"
+
+	"github.com/MatusOllah/slogcolor"
 )
 
 func main() {
@@ -16,6 +19,12 @@ func main() {
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
+	}
+
+	if strings.EqualFold(cfg.Env, "production") || strings.EqualFold(cfg.Env, "prod") {
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{})))
+	} else {
+		slog.SetDefault(slog.New(slogcolor.NewHandler(os.Stderr, slogcolor.DefaultOptions)))
 	}
 
 	application, err := app.New(slog.Default(), cfg)

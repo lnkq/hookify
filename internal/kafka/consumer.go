@@ -17,30 +17,66 @@ type Handler interface {
 
 type Consumer struct {
 	log     *slog.Logger
-	reader  *kafka.Reader
+	readers []*kafka.Reader
 	handler Handler
+	workers int
 }
 
-func NewConsumer(log *slog.Logger, brokers []string, topic, groupID string, handler Handler) *Consumer {
-	return &Consumer{
-		log: log,
-		reader: kafka.NewReader(kafka.ReaderConfig{
+func NewConsumer(log *slog.Logger, brokers []string, topic, groupID string, handler Handler, workers int) *Consumer {
+	if workers <= 0 {
+		workers = 1
+	}
+
+	readers := make([]*kafka.Reader, 0, workers)
+	for i := 0; i < workers; i++ {
+		readers = append(readers, kafka.NewReader(kafka.ReaderConfig{
 			Brokers:  brokers,
 			Topic:    topic,
 			GroupID:  groupID,
 			MaxBytes: 10e6,
-		}),
+		}))
+	}
+
+	return &Consumer{
+		log:     log,
+		readers: readers,
 		handler: handler,
+		workers: workers,
 	}
 }
 
 func (c *Consumer) Close() error {
-	return c.reader.Close()
+	var firstErr error
+	for _, r := range c.readers {
+		if err := r.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
+	errCh := make(chan error, len(c.readers))
+
+	for _, r := range c.readers {
+		reader := r
+		go func() {
+			errCh <- c.runReader(ctx, reader)
+		}()
+	}
+
+	var firstErr error
+	for range c.readers {
+		if err := <-errCh; err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func (c *Consumer) runReader(ctx context.Context, reader *kafka.Reader) error {
 	for {
-		m, err := c.reader.FetchMessage(ctx)
+		m, err := reader.FetchMessage(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return nil
@@ -53,7 +89,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 		var event models.RawEvent
 		if err := json.Unmarshal(m.Value, &event); err != nil {
 			c.log.Error("failed to unmarshal message", "error", err)
-			if err := c.reader.CommitMessages(ctx, m); err != nil {
+			if err := reader.CommitMessages(ctx, m); err != nil {
 				c.log.Error("failed to commit poison message", "error", err)
 			}
 			continue
@@ -64,7 +100,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 			continue
 		}
 
-		if err := c.reader.CommitMessages(ctx, m); err != nil {
+		if err := reader.CommitMessages(ctx, m); err != nil {
 			c.log.Error("failed to commit message", "error", err)
 		}
 	}

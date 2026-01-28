@@ -32,7 +32,7 @@ func New(log *slog.Logger, cfg config.Config) (*App, error) {
 
 	gRPCServer := grpcapp.New(log, hookifyService, cfg.GRPCPort)
 	deliveryService := delivery.New(log, storage, storage)
-	consumer := kafka.NewConsumer(log, cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID, deliveryService)
+	consumer := kafka.NewConsumer(log, cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID, deliveryService, cfg.ConsumerWorkers)
 
 	return &App{
 		log:        log,
