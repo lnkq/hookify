@@ -19,6 +19,7 @@ type App struct {
 	grpcServer *grpcapp.Server
 	consumer   *kafka.Consumer
 	producer   *kafka.Producer
+	storage    *postgres.Storage
 }
 
 func New(log *slog.Logger, cfg config.Config) (*App, error) {
@@ -39,6 +40,7 @@ func New(log *slog.Logger, cfg config.Config) (*App, error) {
 		grpcServer: gRPCServer,
 		consumer:   consumer,
 		producer:   producer,
+		storage:    storage,
 	}, nil
 }
 
@@ -70,6 +72,11 @@ func (a *App) Stop() {
 	if a.producer != nil {
 		if err := a.producer.Close(); err != nil {
 			a.log.Error("failed to close kafka producer", "error", err)
+		}
+	}
+	if a.storage != nil {
+		if err := a.storage.Close(); err != nil {
+			a.log.Error("failed to close postgres storage", "error", err)
 		}
 	}
 }

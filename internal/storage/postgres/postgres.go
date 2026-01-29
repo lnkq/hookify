@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hookify/internal/models"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -20,7 +21,22 @@ func New(dsn string) (*Storage, error) {
 		return nil, fmt.Errorf("failed to open postgres connection: %w", err)
 	}
 
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ping postgres: %w", err)
+	}
+
 	return &Storage{db: db}, nil
+}
+
+func (s *Storage) Close() error {
+	return s.db.Close()
 }
 
 func (s *Storage) SaveWebhook(ctx context.Context, url string, secret string) (int64, error) {
