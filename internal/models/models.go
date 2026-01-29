@@ -1,6 +1,9 @@
 package models
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type EventStatus string
 
@@ -21,6 +24,16 @@ type RawEvent struct {
 	WebhookID int64       `json:"webhook_id"`
 	Payload   string      `json:"payload"`
 	Status    EventStatus `json:"status"`
+}
+
+type OutboxEntry struct {
+	ID            int64     `json:"id"`
+	EventID       int64     `json:"event_id"`
+	WebhookID     int64     `json:"webhook_id"`
+	Payload       string    `json:"payload"`
+	Attempts      int       `json:"attempts"`
+	NextAttemptAt time.Time `json:"next_attempt_at"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 func (e *RawEvent) UnmarshalJSON(data []byte) error {

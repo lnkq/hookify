@@ -15,6 +15,8 @@ type Service struct {
 	log                *slog.Logger
 	webhookProvider    WebhookProvider
 	eventStatusUpdater EventStatusUpdater
+	outboxRepo         OutboxRepository
+	eventPublisher     EventPublisher
 	httpClient         *http.Client
 }
 
@@ -26,11 +28,23 @@ type EventStatusUpdater interface {
 	UpdateEventStatus(ctx context.Context, eventID int64, status models.EventStatus) error
 }
 
-func New(log *slog.Logger, webhookProvider WebhookProvider, eventStatusUpdater EventStatusUpdater) *Service {
+type OutboxRepository interface {
+	GetDueOutboxEntries(ctx context.Context, limit int) ([]models.OutboxEntry, error)
+	UpdateOutboxEntry(ctx context.Context, id int64, attempts int, nextAttemptAt time.Time) error
+	DeleteOutboxEntry(ctx context.Context, id int64) error
+}
+
+type EventPublisher interface {
+	PublishEvent(ctx context.Context, event models.RawEvent) error
+}
+
+func New(log *slog.Logger, webhookProvider WebhookProvider, eventStatusUpdater EventStatusUpdater, outboxRepo OutboxRepository, eventPublisher EventPublisher) *Service {
 	return &Service{
 		log:                log,
 		webhookProvider:    webhookProvider,
 		eventStatusUpdater: eventStatusUpdater,
+		outboxRepo:         outboxRepo,
+		eventPublisher:     eventPublisher,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},

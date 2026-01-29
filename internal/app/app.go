@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"hookify/internal/config"
 	"hookify/internal/delivery"
@@ -15,11 +16,12 @@ import (
 )
 
 type App struct {
-	log        *slog.Logger
-	grpcServer *grpcapp.Server
-	consumer   *kafka.Consumer
-	producer   *kafka.Producer
-	storage    *postgres.Storage
+	log             *slog.Logger
+	grpcServer      *grpcapp.Server
+	consumer        *kafka.Consumer
+	producer        *kafka.Producer
+	storage         *postgres.Storage
+	deliveryService *delivery.Service
 }
 
 func New(log *slog.Logger, cfg config.Config) (*App, error) {
@@ -29,26 +31,31 @@ func New(log *slog.Logger, cfg config.Config) (*App, error) {
 	}
 
 	producer := kafka.NewProducer(log, cfg.KafkaBrokers, cfg.KafkaTopic)
-	hookifyService := hookify.New(log, storage, storage, producer)
+	hookifyService := hookify.New(log, storage, storage)
 
 	gRPCServer := grpcapp.New(log, hookifyService, cfg.GRPCPort)
-	deliveryService := delivery.New(log, storage, storage)
+	deliveryService := delivery.New(log, storage, storage, storage, producer)
 	consumer := kafka.NewConsumer(log, cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID, deliveryService, cfg.ConsumerWorkers)
 
 	return &App{
-		log:        log,
-		grpcServer: gRPCServer,
-		consumer:   consumer,
-		producer:   producer,
-		storage:    storage,
+		log:             log,
+		grpcServer:      gRPCServer,
+		consumer:        consumer,
+		producer:        producer,
+		storage:         storage,
+		deliveryService: deliveryService,
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
 
 	go func() { errCh <- a.grpcServer.Run() }()
 	go func() { errCh <- a.consumer.Run(ctx) }()
+	go func() {
+		a.deliveryService.RunOutboxWorker(ctx, time.Second)
+		errCh <- nil
+	}()
 
 	select {
 	case <-ctx.Done():

@@ -39,6 +39,70 @@ func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
+func (s *Storage) SaveEventWithOutbox(ctx context.Context, webhookID int64, payload string) (int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	var eventID int64
+	err = tx.QueryRowContext(ctx, "INSERT INTO events(webhook_id, payload, status) VALUES($1, $2, $3) RETURNING id", webhookID, payload, models.EventStatusPending).Scan(&eventID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert event: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, "INSERT INTO outbox(event_id, webhook_id, payload, attempts, next_attempt_at) VALUES($1, $2, $3, 0, NOW())", eventID, webhookID, payload)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert outbox entry: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return eventID, nil
+}
+
+func (s *Storage) GetDueOutboxEntries(ctx context.Context, limit int) ([]models.OutboxEntry, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, event_id, webhook_id, payload, attempts, next_attempt_at, created_at 
+		FROM outbox 
+		WHERE next_attempt_at <= NOW() 
+		ORDER BY next_attempt_at ASC, id ASC 
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query outbox: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []models.OutboxEntry
+	for rows.Next() {
+		var e models.OutboxEntry
+		if err := rows.Scan(&e.ID, &e.EventID, &e.WebhookID, &e.Payload, &e.Attempts, &e.NextAttemptAt, &e.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan outbox entry: %w", err)
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+func (s *Storage) UpdateOutboxEntry(ctx context.Context, id int64, attempts int, nextAttemptAt time.Time) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE outbox SET attempts=$1, next_attempt_at=$2 WHERE id=$3", attempts, nextAttemptAt, id)
+	if err != nil {
+		return fmt.Errorf("failed to update outbox entry: %w", err)
+	}
+	return nil
+}
+
+func (s *Storage) DeleteOutboxEntry(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM outbox WHERE id=$1", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete outbox entry: %w", err)
+	}
+	return nil
+}
+
 func (s *Storage) SaveWebhook(ctx context.Context, url string, secret string) (int64, error) {
 	var id int64
 	err := s.db.QueryRowContext(ctx, "INSERT INTO webhooks(url, secret) VALUES($1, $2) RETURNING id", url, secret).Scan(&id)

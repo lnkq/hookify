@@ -11,10 +11,9 @@ import (
 )
 
 type Service struct {
-	log            *slog.Logger
-	webhookRepo    WebhookRepository
-	eventSaver     EventSaver
-	eventPublisher EventPublisher
+	log         *slog.Logger
+	webhookRepo WebhookRepository
+	eventSaver  EventSaver
 }
 
 type WebhookRepository interface {
@@ -23,15 +22,11 @@ type WebhookRepository interface {
 }
 
 type EventSaver interface {
-	SaveEvent(ctx context.Context, webhookID int64, payload string) (int64, error)
+	SaveEventWithOutbox(ctx context.Context, webhookID int64, payload string) (int64, error)
 }
 
-type EventPublisher interface {
-	PublishEvent(ctx context.Context, event models.RawEvent) error
-}
-
-func New(log *slog.Logger, webhookRepo WebhookRepository, eventSaver EventSaver, eventPublisher EventPublisher) *Service {
-	return &Service{log: log, webhookRepo: webhookRepo, eventSaver: eventSaver, eventPublisher: eventPublisher}
+func New(log *slog.Logger, webhookRepo WebhookRepository, eventSaver EventSaver) *Service {
+	return &Service{log: log, webhookRepo: webhookRepo, eventSaver: eventSaver}
 }
 
 func (s *Service) CreateWebhook(ctx context.Context, url string) (webhookID int64, secret string, err error) {
@@ -65,22 +60,9 @@ func (s *Service) SubmitEvent(ctx context.Context, webhookID int64, payload stri
 		return 0, ErrInvalidWebhookSecret
 	}
 
-	eventID, err = s.eventSaver.SaveEvent(ctx, webhookID, payload)
+	eventID, err = s.eventSaver.SaveEventWithOutbox(ctx, webhookID, payload)
 	if err != nil {
 		return 0, fmt.Errorf("failed to save event: %w", err)
-	}
-
-	// TODO: This design is naive and should be improved in the future.
-	rawEvent := models.RawEvent{
-		ID:        eventID,
-		WebhookID: webhookID,
-		Payload:   payload,
-		Status:    models.EventStatusPending,
-	}
-
-	err = s.eventPublisher.PublishEvent(ctx, rawEvent)
-	if err != nil {
-		s.log.Error("failed to publish event", "error", err)
 	}
 
 	return eventID, nil

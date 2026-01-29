@@ -21,8 +21,6 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	// Best-effort load for local development. In CI/tests you often want hermetic env;
-	// set HOOKIFY_SKIP_DOTENV=1 to disable reading .env.
 	if strings.TrimSpace(os.Getenv("HOOKIFY_SKIP_DOTENV")) != "1" {
 		_ = godotenv.Load()
 	}

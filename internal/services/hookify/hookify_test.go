@@ -37,27 +37,15 @@ type eventSaverMock struct {
 	err            error
 }
 
-func (m *eventSaverMock) SaveEvent(ctx context.Context, webhookID int64, payload string) (int64, error) {
+func (m *eventSaverMock) SaveEventWithOutbox(ctx context.Context, webhookID int64, payload string) (int64, error) {
 	m.savedWebhookID = webhookID
 	m.savedPayload = payload
 	return m.id, m.err
 }
 
-type publisherMock struct {
-	published models.RawEvent
-	err       error
-	called    bool
-}
-
-func (m *publisherMock) PublishEvent(ctx context.Context, event models.RawEvent) error {
-	m.published = event
-	m.called = true
-	return m.err
-}
-
 func TestCreateWebhook_GeneratesSecretAndSaves(t *testing.T) {
 	repo := &webhookRepoMock{saveID: 123}
-	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, &eventSaverMock{}, &publisherMock{})
+	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, &eventSaverMock{})
 
 	id, secret, err := svc.CreateWebhook(context.Background(), "https://example.com")
 	if err != nil {
@@ -82,7 +70,7 @@ func TestCreateWebhook_GeneratesSecretAndSaves(t *testing.T) {
 
 func TestSubmitEvent_WebhookNotFound(t *testing.T) {
 	repo := &webhookRepoMock{getErr: models.ErrWebhookNotFound}
-	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, &eventSaverMock{}, &publisherMock{})
+	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, &eventSaverMock{})
 
 	_, err := svc.SubmitEvent(context.Background(), 1, `{}`, "x")
 	if !errors.Is(err, models.ErrWebhookNotFound) {
@@ -92,7 +80,7 @@ func TestSubmitEvent_WebhookNotFound(t *testing.T) {
 
 func TestSubmitEvent_InvalidSecret(t *testing.T) {
 	repo := &webhookRepoMock{getWebhook: models.Webhook{ID: 1, URL: "https://example.com", Secret: "expected"}}
-	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, &eventSaverMock{}, &publisherMock{})
+	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, &eventSaverMock{})
 
 	_, err := svc.SubmitEvent(context.Background(), 1, `{}`, "wrong")
 	if !errors.Is(err, ErrInvalidWebhookSecret) {
@@ -103,31 +91,9 @@ func TestSubmitEvent_InvalidSecret(t *testing.T) {
 func TestSubmitEvent_PublishesPendingEvent(t *testing.T) {
 	repo := &webhookRepoMock{getWebhook: models.Webhook{ID: 7, URL: "https://example.com", Secret: "s"}}
 	saver := &eventSaverMock{id: 99}
-	pub := &publisherMock{}
-	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, saver, pub)
+	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, saver)
 
 	id, err := svc.SubmitEvent(context.Background(), 7, `{"a":1}`, "s")
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-	if id != 99 {
-		t.Fatalf("expected event id=99, got %d", id)
-	}
-	if !pub.called {
-		t.Fatalf("expected publisher to be called")
-	}
-	if pub.published.ID != 99 || pub.published.WebhookID != 7 || pub.published.Payload != `{"a":1}` || pub.published.Status != models.EventStatusPending {
-		t.Fatalf("unexpected published event: %#v", pub.published)
-	}
-}
-
-func TestSubmitEvent_PublishErrorDoesNotFailRequest(t *testing.T) {
-	repo := &webhookRepoMock{getWebhook: models.Webhook{ID: 7, URL: "https://example.com", Secret: "s"}}
-	saver := &eventSaverMock{id: 99}
-	pub := &publisherMock{err: errors.New("kafka down")}
-	svc := New(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})), repo, saver, pub)
-
-	id, err := svc.SubmitEvent(context.Background(), 7, `{}`, "s")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
