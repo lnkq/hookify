@@ -52,7 +52,7 @@ func (s *Storage) SaveEventWithOutbox(ctx context.Context, webhookID int64, payl
 		return 0, fmt.Errorf("failed to insert event: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx, "INSERT INTO outbox(event_id, webhook_id, payload, attempts, next_attempt_at) VALUES($1, $2, $3, 0, NOW())", eventID, webhookID, payload)
+	_, err = tx.ExecContext(ctx, "INSERT INTO outbox(event_id, webhook_id, payload, attempts, next_attempt_at, type) VALUES($1, $2, $3, 0, NOW(), $4)", eventID, webhookID, payload, models.OutboxTypePublish)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert outbox entry: %w", err)
 	}
@@ -66,7 +66,7 @@ func (s *Storage) SaveEventWithOutbox(ctx context.Context, webhookID int64, payl
 
 func (s *Storage) GetDueOutboxEntries(ctx context.Context, limit int) ([]models.OutboxEntry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, event_id, webhook_id, payload, attempts, next_attempt_at, created_at 
+		SELECT id, event_id, webhook_id, payload, attempts, next_attempt_at, created_at, type 
 		FROM outbox 
 		WHERE next_attempt_at <= NOW() 
 		ORDER BY next_attempt_at ASC, id ASC 
@@ -79,12 +79,22 @@ func (s *Storage) GetDueOutboxEntries(ctx context.Context, limit int) ([]models.
 	var entries []models.OutboxEntry
 	for rows.Next() {
 		var e models.OutboxEntry
-		if err := rows.Scan(&e.ID, &e.EventID, &e.WebhookID, &e.Payload, &e.Attempts, &e.NextAttemptAt, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.EventID, &e.WebhookID, &e.Payload, &e.Attempts, &e.NextAttemptAt, &e.CreatedAt, &e.Type); err != nil {
 			return nil, fmt.Errorf("failed to scan outbox entry: %w", err)
 		}
 		entries = append(entries, e)
 	}
 	return entries, rows.Err()
+}
+
+func (s *Storage) SaveOutboxEntry(ctx context.Context, eventID int64, webhookID int64, payload string, attempts int, nextAttemptAt time.Time, jobType models.OutboxType) (int64, error) {
+	var id int64
+	err := s.db.QueryRowContext(ctx, "INSERT INTO outbox(event_id, webhook_id, payload, attempts, next_attempt_at, type) VALUES($1, $2, $3, $4, $5, $6) RETURNING id", eventID, webhookID, payload, attempts, nextAttemptAt, jobType).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert outbox entry: %w", err)
+	}
+
+	return id, nil
 }
 
 func (s *Storage) UpdateOutboxEntry(ctx context.Context, id int64, attempts int, nextAttemptAt time.Time) error {

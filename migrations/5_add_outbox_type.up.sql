@@ -1,0 +1,1 @@
+ALTER TABLE outbox ADD COLUMN type VARCHAR(32) NOT NULL DEFAULT 'publish';

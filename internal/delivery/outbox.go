@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"fmt"
 	"hookify/internal/models"
 	"time"
 )
@@ -30,17 +31,37 @@ func (s *Service) processOutbox(ctx context.Context) error {
 	}
 
 	for _, entry := range entries {
-		rawEvent := models.RawEvent{
-			ID:        entry.EventID,
-			WebhookID: entry.WebhookID,
-			Payload:   entry.Payload,
-		}
-		err = s.eventPublisher.PublishEvent(ctx, rawEvent)
-		if err != nil {
-			s.log.Error("failed to publish outbox entry", "error", err)
+		var processErr error
 
-			nextAttempt := time.Now().Add(time.Duration(entry.Attempts+1) * 5 * time.Second)
-			if updateErr := s.outboxRepo.UpdateOutboxEntry(ctx, entry.ID, entry.Attempts+1, nextAttempt); updateErr != nil {
+		switch entry.Type {
+		case models.OutboxTypePublish:
+			rawEvent := models.RawEvent{
+				ID:        entry.EventID,
+				WebhookID: entry.WebhookID,
+				Payload:   entry.Payload,
+			}
+			processErr = s.eventPublisher.PublishEvent(ctx, rawEvent)
+		case models.OutboxTypeDelivery:
+			webhook, err := s.webhookProvider.GetWebhook(ctx, entry.WebhookID)
+			if err != nil {
+				processErr = err
+			} else {
+				processErr = s.sendRequest(ctx, webhook.URL, webhook.Secret, entry.Payload)
+				if processErr == nil {
+					if err := s.eventStatusUpdater.UpdateEventStatus(ctx, entry.EventID, models.EventStatusDelivered); err != nil {
+						processErr = fmt.Errorf("failed to update event status: %w", err)
+					}
+				}
+			}
+		}
+
+		if processErr != nil {
+			s.log.Error("failed to process outbox entry", "id", entry.ID, "type", entry.Type, "error", processErr)
+
+			nextAttempts := entry.Attempts + 1
+			nextAttemptAt := time.Now().Add(time.Duration(nextAttempts) * 5 * time.Second)
+
+			if updateErr := s.outboxRepo.UpdateOutboxEntry(ctx, entry.ID, nextAttempts, nextAttemptAt); updateErr != nil {
 				s.log.Error("failed to update outbox entry", "id", entry.ID, "error", updateErr)
 			}
 			continue

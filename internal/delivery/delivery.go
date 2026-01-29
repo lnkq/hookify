@@ -32,6 +32,7 @@ type OutboxRepository interface {
 	GetDueOutboxEntries(ctx context.Context, limit int) ([]models.OutboxEntry, error)
 	UpdateOutboxEntry(ctx context.Context, id int64, attempts int, nextAttemptAt time.Time) error
 	DeleteOutboxEntry(ctx context.Context, id int64) error
+	SaveOutboxEntry(ctx context.Context, eventID int64, webhookID int64, payload string, attempts int, nextAttemptAt time.Time, jobType models.OutboxType) (int64, error)
 }
 
 type EventPublisher interface {
@@ -61,10 +62,16 @@ func (s *Service) HandleEvent(ctx context.Context, event models.RawEvent) error 
 
 	err = s.sendRequest(ctx, webhook.URL, webhook.Secret, event.Payload)
 	if err != nil {
-		if updateErr := s.eventStatusUpdater.UpdateEventStatus(ctx, event.ID, models.EventStatusFailed); updateErr != nil {
-			s.log.Error("failed to update event status to failed", "error", updateErr)
+		s.log.Error("failed to send request, queueing for retry", "error", err)
+		_, saveErr := s.outboxRepo.SaveOutboxEntry(ctx, event.ID, event.WebhookID, event.Payload, 0, time.Now().Add(5*time.Second), models.OutboxTypeDelivery)
+		if saveErr != nil {
+			s.log.Error("failed to save outbox entry for delivery retry", "error", saveErr)
+			if updateErr := s.eventStatusUpdater.UpdateEventStatus(ctx, event.ID, models.EventStatusFailed); updateErr != nil {
+				s.log.Error("failed to update event status to failed", "error", updateErr)
+			}
+			return fmt.Errorf("failed to queue retry: %w", saveErr)
 		}
-		return fmt.Errorf("failed to send request: %w", err)
+		return nil
 	}
 
 	if err := s.eventStatusUpdater.UpdateEventStatus(ctx, event.ID, models.EventStatusDelivered); err != nil {
