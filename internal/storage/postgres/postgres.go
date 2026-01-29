@@ -44,7 +44,7 @@ func (s *Storage) SaveEventWithOutbox(ctx context.Context, webhookID int64, payl
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var eventID int64
 	err = tx.QueryRowContext(ctx, "INSERT INTO events(webhook_id, payload, status) VALUES($1, $2, $3) RETURNING id", webhookID, payload, models.EventStatusPending).Scan(&eventID)
@@ -74,7 +74,7 @@ func (s *Storage) GetDueOutboxEntries(ctx context.Context, limit int) ([]models.
 	if err != nil {
 		return nil, fmt.Errorf("failed to query outbox: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []models.OutboxEntry
 	for rows.Next() {
