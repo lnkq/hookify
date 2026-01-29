@@ -58,6 +58,17 @@ func (s *Service) processOutbox(ctx context.Context) error {
 		if processErr != nil {
 			s.log.Error("failed to process outbox entry", "id", entry.ID, "type", entry.Type, "error", processErr)
 
+			if time.Since(entry.CreatedAt) > 24*time.Hour {
+				s.log.Error("outbox entry exceeded 24h deadline, dropping", "id", entry.ID)
+				if err := s.eventStatusUpdater.UpdateEventStatus(ctx, entry.EventID, models.EventStatusFailed); err != nil {
+					s.log.Error("failed to mark event as failed", "event_id", entry.EventID, "error", err)
+				}
+				if err := s.outboxRepo.DeleteOutboxEntry(ctx, entry.ID); err != nil {
+					s.log.Error("failed to delete expired outbox entry", "id", entry.ID, "error", err)
+				}
+				continue
+			}
+
 			nextAttempts := entry.Attempts + 1
 			nextAttemptAt := time.Now().Add(time.Duration(nextAttempts) * 5 * time.Second)
 
