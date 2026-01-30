@@ -30,10 +30,11 @@ func NewConsumer(log *slog.Logger, brokers []string, topic, groupID string, hand
 	readers := make([]*kafka.Reader, 0, workers)
 	for i := 0; i < workers; i++ {
 		readers = append(readers, kafka.NewReader(kafka.ReaderConfig{
-			Brokers:  brokers,
-			Topic:    topic,
-			GroupID:  groupID,
-			MaxBytes: 10e6,
+			Brokers:     brokers,
+			Topic:       topic,
+			GroupID:     groupID,
+			StartOffset: kafka.FirstOffset,
+			MaxBytes:    10e6,
 		}))
 	}
 
